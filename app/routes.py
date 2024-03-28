@@ -1,11 +1,9 @@
 from flask import request
-
-from app import app
+from app import app, db
 from fake_data.tasks import tasks_list
+from datetime import datetime, timezone
+from.models import Task
 
-from datetime import datetime
-
-tasks=[]
 
 @app.route('/')
 def index():
@@ -29,23 +27,19 @@ def create_task():
     title = data.get('title')
     description = data.get('description')
 
-    new_task = {
-        "id": len(tasks) + 1,
-        "title": title,
-        "description": description,
-        "completed": False,
-        "created at": datetime.utcnow
-    }
+    new_task = Task(title = title, description= description)
+
+    return new_task.to_dict(), 201
 
 @app.route('/tasks')
-def get_task():
-    tasks = tasks_list
-    return tasks
+def get_tasks():
+    tasks = db.session.execute(db.select(Task)).scalars().all()
+    return [task.to_dict() for task in tasks]
 
 @app.route('/tasks/<int:task_id>')
 def get_single_task(task_id):
-    tasks=tasks_list
-    for task in tasks:
-        if task['id'] == task_id:
-            return task
-    return f"The task ID of {task_id} does nt exist.", 404
+    task=db.session.get(Task, task_id)
+    if task:
+        return task.to_dict()
+    else:
+        return f"The task ID of {task_id} does nt exist.", 404
