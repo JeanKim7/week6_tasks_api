@@ -10,6 +10,7 @@ class Task(db.Model):
     completed = db.Column(db.Boolean, nullable = False, default = False)
     created_at = db.Column(db.DateTime, nullable = False, default = datetime.now(timezone.utc))
     due_date = db.Column(db.DateTime(timezone=True))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', back_populates = 'tasks')
 
     def __init__(self, **kwargs):
@@ -32,6 +33,18 @@ class Task(db.Model):
             "createdAt": self.created_at,
             "dueDate": self.due_date
         }
+    
+    def update(self, **kwargs):
+        allowed_fields = {'title', 'description', 'completed', 'dueDate'}
+
+        for key,value in kwargs.items():
+            if key in allowed_fields:
+                setattr(self, key, value)
+        self.save()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key = True)
@@ -81,3 +94,7 @@ class User(db.Model):
         self.token_expiration = now+timedelta(hours=1)
         self.save()
         return {"token":self.token, "tokenExpiration": self.token_expiration}
+    
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
