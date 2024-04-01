@@ -3,7 +3,7 @@ from app import app, db
 from fake_data.tasks import tasks_list
 from datetime import datetime, timezone
 from .models import Task, User
-from .auth import token_auth
+from .auth import token_auth, basic_auth
 
 @app.route('/')
 def index():
@@ -112,3 +112,83 @@ def create_user():
     
     new_user= User(first_name=first_name, last_name=last_name, email=email, username=username, password=password)
 
+@app.route('/users')
+def get_users():
+    users= db.session.execute(db.select(User)).scalars().all()
+    return [user.to_dict() for user in users]
+
+@app.route('/users/<int:user_id>')
+def get_user(user_id):
+    user = db.session.get(User, user_id)
+    if user:
+        return user.to_dict()
+    else:
+        return {'error':f"User with an ID of {user_id} does not exist"}, 404
+    
+@app.route('/users/<int:user_id>')
+@token_auth.login_required
+def update_user(user_id):
+    if not request.is_json:
+        return {'error': 'Your content-type must be application/json'}, 400
+    user = db.session.get(User, user_id)
+    if user is None:
+        return {'error': f"User with id of {user_id} does not exist"}, 404
+    current_user=token_auth.current_user()
+    if current_user.id != user.id:
+        return {'error': 'You cannot update other user accounts'}, 403
+    
+    data=request.json
+
+    username = data.get('username')
+    email = data.get('email')
+
+    check_users = db.session.execute(db.select(User).where((User.username == username) | (User.email == email))).scalars.all()
+    if user in check_users:
+        return {'error': 'You already have that username or email'}, 400
+    elif check_users:
+        return {'error': 'A user with that username and/or email already exists'}, 400
+    
+    changeable = {'firstName', 'lastName', 'password', 'username', 'email'}
+    for key,value in data.items():
+        if key in changeable:
+            setattr(user, key, value)
+    user.save()
+
+    if 'password' in data:
+        return {
+            "id": user.id,
+            "firstName": user.first_name,
+            "lastName": user.last_name,
+            "username": user.username,
+            "email": user.email,
+            "password": "Your password has been changed!"
+        }
+    else: 
+        return {
+            "id": user.id,
+            "firstName": user.first_name,
+            "lastName": user.last_name,
+            "username": user.username,
+            "email": user.email
+        }
+    
+@app.route('/users/<int:user_id>', methods = ['DELETE'])
+@token_auth.login_required
+def delete_user(user_id):
+    user = db.session.get(User, user_id)
+
+    if user is None:
+        return {'error': f'A user with a user id of {user_id} does not exist'}, 404
+    
+    if token_auth.current_user().id != user_id:
+        return {'error': "You do not have permission to delete other users"}, 403
+    else:
+        user.delete()
+    return {'success': f'User with user id of {user_id} was deleted'}
+
+
+@app.route('/token')
+@basic_auth.login_required
+def get_token():
+    user=basic_auth.current_user()
+    return user.get_token()
