@@ -106,11 +106,13 @@ def create_user():
     email = data.get('email')
     password = data.get('password')
 
-    check_users = db.session.execute(db.select(User).where((User.username == username) | (User.email == email))).scalars.all()
+    check_users = db.session.execute(db.select(User).where((User.username == username) | (User.email == email))).scalars().all()
     if check_users:
         return {'error': 'A user with that username and/or email already exists'}, 400
     
     new_user= User(first_name=first_name, last_name=last_name, email=email, username=username, password=password)
+
+    return new_user.to_dict()
 
 @app.route('/users')
 def get_users():
@@ -125,7 +127,7 @@ def get_user(user_id):
     else:
         return {'error':f"User with an ID of {user_id} does not exist"}, 404
     
-@app.route('/users/<int:user_id>')
+@app.route('/users/<int:user_id>', methods = ['PUT'])
 @token_auth.login_required
 def update_user(user_id):
     if not request.is_json:
@@ -142,19 +144,20 @@ def update_user(user_id):
     username = data.get('username')
     email = data.get('email')
 
-    check_users = db.session.execute(db.select(User).where((User.username == username) | (User.email == email))).scalars.all()
+    check_users = db.session.execute(db.select(User).where((User.username == username) | (User.email == email))).scalars().all()
     if user in check_users:
         return {'error': 'You already have that username or email'}, 400
     elif check_users:
         return {'error': 'A user with that username and/or email already exists'}, 400
     
-    changeable = {'firstName', 'lastName', 'password', 'username', 'email'}
+    changeable = {'firstName', 'lastName', 'username', 'email'}
     for key,value in data.items():
         if key in changeable:
             setattr(user, key, value)
     user.save()
 
     if 'password' in data:
+        user.set_password(data.get('password'))
         return {
             "id": user.id,
             "firstName": user.first_name,

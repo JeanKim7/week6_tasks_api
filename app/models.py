@@ -70,7 +70,7 @@ class User(db.Model):
         self.save()
 
     def save(self):
-        db.session.add()
+        db.session.add(self)
         db.session.commit()
 
     def check_password(self, plaintext_password):
