@@ -26,8 +26,8 @@ def create_task():
     
     title = data.get('title')
     description = data.get('description')
-
-    new_task = Task(title = title, description= description)
+    due_date = data.get('dueDate')
+    new_task = Task(title = title, description= description, due_date=due_date)
 
     return new_task.to_dict(), 201
 
@@ -43,3 +43,8 @@ def get_single_task(task_id):
         return task.to_dict()
     else:
         return f"The task ID of {task_id} does nt exist.", 404
+    
+@app.route('/tasks/completed')
+def get_completed_tasks():
+    done_tasks = db.session.execute(db.select(Task).where(Task.completed == True))
+    return [task.to_dict() for task in done_tasks]
